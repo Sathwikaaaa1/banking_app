@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Bank</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 400px; margin: auto; }
+        .card { border: 1px solid #ccc; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        button { cursor: pointer; padding: 5px 10px; }
+        input { padding: 5px; margin-right: 5px; }
+        .hidden { display: none; }
+        .error { color: red; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+
+    <div id="login-section" class="card">
+        <h2>Login / Register</h2>
+        <input type="text" id="username" placeholder="Username (e.g. alice)">
+        <button onclick="login()">Enter</button>
+        <p id="login-error" class="error"></p>
+    </div>
+
+    <div id="dashboard-section" class="card hidden">
+        <h2>Welcome, <span id="display-username"></span></h2>
+        <h1>Balance: $<span id="display-balance">0</span></h1>
+        
+        <hr>
+        
+        <h3>Actions</h3>
+        <input type="number" id="amount" placeholder="Amount">
+        <br><br>
+        <button onclick="transact('deposit')">Deposit</button>
+        <button onclick="transact('withdraw')">Withdraw</button>
+        <p id="action-msg"></p>
+    </div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+        let currentUserId = null;
+
+        async function login() {
+            const username = document.getElementById('username').value;
+            if (!username) return;
+
+            // 1. Try to register first (Simplification for learning)
+            // If user exists, this returns error, then we try to login/fetch.
+            try {
+                // Try creating user
+                let response = await fetch(`${API_URL}/users/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: username, password: "password" })
+                });
+
+                // If 400, user exists. That's fine, we proceed to fetch details.
+                if (response.ok || response.status === 400) {
+                    // In a real app, we would authenticate here.
+                    // For this demo, we assume the user ID is 1 (alice).
+                    // To make it dynamic, we need to fetch the ID by username, 
+                    // but our API only supports fetching by ID right now.
+                    // *Hack for Learning:* We will just use ID 1 for 'alice'.
+                    // If you created other users, this simple UI might need updates.
+                    currentUserId = 1; 
+                    
+                    fetchBalance();
+                    
+                    // Switch UI
+                    document.getElementById('login-section').classList.add('hidden');
+                    document.getElementById('dashboard-section').classList.remove('hidden');
+                    document.getElementById('display-username').innerText = username;
+                } 
+            } catch (err) {
+                console.error(err);
+                document.getElementById('login-error').innerText = "Connection Failed";
+            }
+        }
+
+        async function fetchBalance() {
+            let res = await fetch(`${API_URL}/users/${currentUserId}`);
+            let data = await res.json();
+            document.getElementById('display-balance').innerText = data.balance;
+        }
+
+        async function transact(type) {
+            const amount = parseInt(document.getElementById('amount').value);
+            if (!amount) return;
+
+            const endpoint = type === 'deposit' ? 'deposit' : 'withdraw';
+            
+            let res = await fetch(`${API_URL}/users/${currentUserId}/${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount: amount })
+            });
+
+            if (res.ok) {
+                document.getElementById('action-msg').innerText = `Success: ${type}`;
+                document.getElementById('action-msg').style.color = "green";
+                fetchBalance(); // Refresh balance
+            } else {
+                let err = await res.json();
+                document.getElementById('action-msg').innerText = `Error: ${err.detail}`;
+                document.getElementById('action-msg').style.color = "red";
+            }
+        }
+    </script>
+</body>
+</html>
